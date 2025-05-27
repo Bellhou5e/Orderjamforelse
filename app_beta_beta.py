@@ -13,6 +13,17 @@ REVIEWED_DIR = "granskade_ordrar"
 os.makedirs(HISTORY_DIR, exist_ok=True)
 os.makedirs(REVIEWED_DIR, exist_ok=True)
 
+# --- GLOBAL CSS FÖR SCROLL ---
+st.markdown("""
+    <style>
+        .block-container {
+            max-height: 90vh;
+            overflow-y: auto;
+            padding-bottom: 5rem;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- FUNKTION: Kontroll Pressglass ---
 def kontroll_pressglass():
     def extract_orders_from_confirmation(pdf_file):
@@ -45,7 +56,7 @@ def kontroll_pressglass():
                         invoice_id = match.group(1)
                 current_order = None
                 for line in reversed(lines):
-                    order_match = re.search(r"Order[:\/-]?\s*(\d{7})", line)
+                    order_match = re.search(r"Order[:\/\-]?\s*(\d{7})", line)
                     if order_match:
                         current_order = order_match.group(1)
                     elif current_order:
@@ -101,9 +112,9 @@ def kontroll_pressglass():
     st.markdown("### Ladda upp leveransbekräftelse och faktura som PDF")
     col1, col2 = st.columns(2)
     with col1:
-        conf_file = st.file_uploader("Ladda upp leveransbekräftelse", type="pdf", key="conf")
+        conf_file = st.file_uploader("Ladda upp 1", type="pdf", key="conf")
     with col2:
-        fakt_file = st.file_uploader("Ladda upp faktura", type="pdf", key="fakt")
+        fakt_file = st.file_uploader("Ladda upp 2", type="pdf", key="fakt")
 
     result_container = st.container()
     if conf_file and fakt_file:
@@ -131,7 +142,46 @@ def rapporthistorik():
 
 # --- FUNKTION: Orderkontroll ---
 def orderkontroll():
-    st.info("Ladda upp en order som PDF med information om fönster, färg, spröjs etc.")
+    def extract_text_blocks_from_pdf(pdf_file):
+        with pdfplumber.open(pdf_file) as pdf:
+            lines = []
+            for page in pdf.pages:
+                text = page.extract_text()
+                if text:
+                    lines.extend(text.splitlines())
+        return lines
+
+    def detect_pdf_anomalies(text_lines):
+        blocks = []
+        block = []
+        for line in text_lines:
+            if re.match(r"Rad\s*\d+", line):
+                if block:
+                    blocks.append(block)
+                block = [line]
+            else:
+                block.append(line)
+        if block:
+            blocks.append(block)
+
+        anomaly_report = []
+        colors = [line for group in blocks for line in group if any(color in line.lower() for color in ["vit", "röd", "svart"])]
+        common_color = max(set(colors), key=colors.count) if colors else None
+
+        for block in blocks:
+            color_lines = [line for line in block if any(color in line.lower() for color in ["vit", "röd", "svart"])]
+            for color in color_lines:
+                if color != common_color:
+                    header = f"{block[0]} - {next((l for l in block if 'AF' in l or 'AVF' in l), '')}"
+                    anomaly_report.append({
+                        "Header": header,
+                        "Detaljer": [l for l in block[1:] if l != color],
+                        "Avvikelse": color,
+                        "Förväntat": common_color
+                    })
+        return anomaly_report
+
+    st.markdown("### Ladda upp en order som PDF")
     order_pdf = st.file_uploader("Order (PDF)", type="pdf", key="order_pdf")
     if order_pdf:
         lines = extract_text_blocks_from_pdf(order_pdf)
@@ -156,45 +206,6 @@ def orderkontroll():
                         f.write(f"{anomaly['Header']} – {anomaly['Avvikelse']} – Förväntat: {anomaly['Förväntat']} – Status: {response}\n")
                 st.success("Granskningen är sparad.")
 
-def extract_text_blocks_from_pdf(pdf_file):
-    with pdfplumber.open(pdf_file) as pdf:
-        lines = []
-        for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                lines.extend(text.splitlines())
-    return lines
-
-def detect_pdf_anomalies(text_lines):
-    blocks = []
-    block = []
-    for line in text_lines:
-        if re.match(r"Rad\s*\d+", line):
-            if block:
-                blocks.append(block)
-            block = [line]
-        else:
-            block.append(line)
-    if block:
-        blocks.append(block)
-
-    anomaly_report = []
-    colors = [line for group in blocks for line in group if any(color in line.lower() for color in ["vit", "röd", "svart"])]
-    common_color = max(set(colors), key=colors.count) if colors else None
-
-    for block in blocks:
-        color_lines = [line for line in block if any(color in line.lower() for color in ["vit", "röd", "svart"])]
-        for color in color_lines:
-            if color != common_color:
-                header = f"{block[0]} - {next((l for l in block if 'AF' in l or 'AVF' in l), '')}"
-                anomaly_report.append({
-                    "Header": header,
-                    "Detaljer": [l for l in block[1:] if l != color],
-                    "Avvikelse": color,
-                    "Förväntat": common_color
-                })
-    return anomaly_report
-
 # --- FUNKTION: Granskade ordrar ---
 def granskade_ordrar():
     st.info("Sparade granskningar.")
@@ -209,7 +220,7 @@ def testyta():
     st.warning("Detta är en testyta för framtida funktioner. Här kan du experimentera utan att påverka något annat.")
 
 # --- STREAMLIT GRÄNSSNITT ---
-st.set_page_config(page_title="Jämförelse: Leverans vs Faktura", layout="centered")
+st.set_page_config(page_title="Jämförelse: Leverans vs Faktura", layout="wide")
 st.title("🧠 Orderkontrollsystem")
 
 main_tabs = st.tabs(["📦 Kontroll Pressglass", "🧾 Orderkontroll", "🧪 Testyta"])
@@ -220,16 +231,6 @@ with main_tabs[0]:
         kontroll_pressglass()
     with sub_tabs[1]:
         rapporthistorik()
-
-st.markdown("""
-    <style>
-        .block-container {
-            max-height: 90vh;
-            overflow-y: auto;
-            padding-bottom: 5rem;
-        }
-    </style>
-""", unsafe_allow_html=True)
 
 with main_tabs[1]:
     sub_tabs2 = st.tabs(["Granskning", "Granskade ordrar"])
