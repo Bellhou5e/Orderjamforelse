@@ -99,7 +99,7 @@ def kontroll_pressglass():
         pdf.output(filepath)
         return filepath
 
-    st.info("Ladda upp leveransbekräftelse och faktura som PDF.")
+    st.markdown("### Ladda upp leveransbekräftelse och faktura som PDF")
     col1, col2 = st.columns(2)
     with col1:
         conf_file = st.file_uploader("Ladda upp 1", type="pdf", key="conf")
@@ -155,7 +155,7 @@ def testyta():
 st.set_page_config(page_title="Jämförelse: Leverans vs Faktura", layout="wide")
 st.title("🧠 Orderkontrollsystem")
 
-main_tabs = st.tabs(["📦 Kontroll Pressglass", "🧾 Orderkontroll"])
+main_tabs = st.tabs(["📦 Kontroll Pressglass", "🧾 Orderkontroll", "🧪 Testyta"])
 
 with main_tabs[0]:
     sub_tabs = st.tabs(["Jämförelse", "Rapporthistorik"])
@@ -165,11 +165,8 @@ with main_tabs[0]:
         rapporthistorik()
 
 with main_tabs[1]:
-    sub_tabs2 = st.tabs(["Granskning", "Granskade ordrar", "🧪 Testyta"])
+    sub_tabs2 = st.tabs(["Granskning", "Granskade ordrar"])
     with sub_tabs2[0]:
         orderkontroll()
     with sub_tabs2[1]:
         granskade_ordrar()
-    with sub_tabs2[2]:
-        testyta()
-
