@@ -101,9 +101,9 @@ def kontroll_pressglass():
     st.markdown("### Ladda upp leveransbekräftelse och faktura som PDF")
     col1, col2 = st.columns(2)
     with col1:
-        conf_file = st.file_uploader("Ladda upp 1", type="pdf", key="conf")
+        conf_file = st.file_uploader("Ladda upp leveransbekräftelse", type="pdf", key="conf")
     with col2:
-        fakt_file = st.file_uploader("Ladda upp 2", type="pdf", key="fakt")
+        fakt_file = st.file_uploader("Ladda upp fakturan", type="pdf", key="fakt")
 
     result_container = st.container()
     if conf_file and fakt_file:
