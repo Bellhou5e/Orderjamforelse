@@ -153,18 +153,13 @@ with tabs[1]:
     order_pdf = st.file_uploader("Order (PDF)", type="pdf", key="order_pdf")
     if order_pdf:
         lines = extract_text_blocks_from_pdf(order_pdf)
-        st.write("Extraherad text:")
-        st.text("\n".join(lines))
-
         st.subheader("🔍 Avvikelseanalys")
         anomalies = detect_pdf_anomalies(lines)
         if not anomalies:
             st.success("Ingen tydlig avvikelse hittad.")
         else:
-            st.warning("Följande potentiella avvikelser hittades:")
             for i, anomaly in enumerate(anomalies):
-                st.markdown(f"🟥 **Text:** '{anomaly['Text']}' – (Förväntat: '{anomaly['Förväntat']}')")
-                feedback = st.radio("Bekräfta status", ["OK", "EJ OK"], key=f"pdf_feedback_{i}")
+                feedback = st.radio(f"'{anomaly['Text']}' – Förväntat: '{anomaly['Förväntat']}'", ["OK", "EJ OK"], key=f"pdf_feedback_{i}")
 
 with tabs[2]:
     st.info("Tidigare jämförelser som PDF.")
@@ -173,4 +168,3 @@ with tabs[2]:
         filepath = os.path.join(HISTORY_DIR, file)
         with open(filepath, "rb") as f:
             st.download_button(file, data=f, file_name=file, key=file)
-
