@@ -221,6 +221,16 @@ with main_tabs[0]:
     with sub_tabs[1]:
         rapporthistorik()
 
+st.markdown("""
+    <style>
+        .block-container {
+            max-height: 90vh;
+            overflow-y: auto;
+            padding-bottom: 5rem;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 with main_tabs[1]:
     sub_tabs2 = st.tabs(["Granskning", "Granskade ordrar"])
     with sub_tabs2[0]:
