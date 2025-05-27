@@ -131,7 +131,69 @@ def rapporthistorik():
 
 # --- FUNKTION: Orderkontroll ---
 def orderkontroll():
-    st.info("Här bygger vi Orderkontroll.")
+    st.info("Ladda upp en order som PDF med information om fönster, färg, spröjs etc.")
+    order_pdf = st.file_uploader("Order (PDF)", type="pdf", key="order_pdf")
+    if order_pdf:
+        lines = extract_text_blocks_from_pdf(order_pdf)
+        st.subheader("🔍 Avvikelseanalys")
+        anomalies = detect_pdf_anomalies(lines)
+        if not anomalies:
+            st.success("Ingen tydlig avvikelse hittad.")
+        else:
+            feedback_list = []
+            for i, anomaly in enumerate(anomalies):
+                st.markdown(f"**{anomaly['Header']}**")
+                for detail in anomaly['Detaljer']:
+                    st.markdown(f"<p style='margin:0 0 2px 10px;'>{detail}</p>", unsafe_allow_html=True)
+                response = st.radio("Status", ["OK", "EJ OK"], key=f"feedback_{i}")
+                feedback_list.append((anomaly, response))
+                st.markdown("---")
+            if st.button("✔️ Klar"):
+                filename = os.path.splitext(order_pdf.name)[0] + "_granskning.txt"
+                filepath = os.path.join(REVIEWED_DIR, filename)
+                with open(filepath, "w", encoding="utf-8") as f:
+                    for anomaly, response in feedback_list:
+                        f.write(f"{anomaly['Header']} – {anomaly['Avvikelse']} – Förväntat: {anomaly['Förväntat']} – Status: {response}\n")
+                st.success("Granskningen är sparad.")
+
+def extract_text_blocks_from_pdf(pdf_file):
+    with pdfplumber.open(pdf_file) as pdf:
+        lines = []
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                lines.extend(text.splitlines())
+    return lines
+
+def detect_pdf_anomalies(text_lines):
+    blocks = []
+    block = []
+    for line in text_lines:
+        if re.match(r"Rad\s*\d+", line):
+            if block:
+                blocks.append(block)
+            block = [line]
+        else:
+            block.append(line)
+    if block:
+        blocks.append(block)
+
+    anomaly_report = []
+    colors = [line for group in blocks for line in group if any(color in line.lower() for color in ["vit", "röd", "svart"])]
+    common_color = max(set(colors), key=colors.count) if colors else None
+
+    for block in blocks:
+        color_lines = [line for line in block if any(color in line.lower() for color in ["vit", "röd", "svart"])]
+        for color in color_lines:
+            if color != common_color:
+                header = f"{block[0]} - {next((l for l in block if 'AF' in l or 'AVF' in l), '')}"
+                anomaly_report.append({
+                    "Header": header,
+                    "Detaljer": [l for l in block[1:] if l != color],
+                    "Avvikelse": color,
+                    "Förväntat": common_color
+                })
+    return anomaly_report
 
 # --- FUNKTION: Granskade ordrar ---
 def granskade_ordrar():
