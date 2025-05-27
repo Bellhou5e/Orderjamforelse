@@ -9,7 +9,9 @@ import os
 from datetime import datetime
 
 HISTORY_DIR = "rapporthistorik"
+REVIEWED_DIR = "granskade_ordrar"
 os.makedirs(HISTORY_DIR, exist_ok=True)
+os.makedirs(REVIEWED_DIR, exist_ok=True)
 
 # --- PRESSGLASS ---
 def extract_orders_from_confirmation(pdf_file):
@@ -128,7 +130,7 @@ def detect_pdf_anomalies(text_lines):
 st.set_page_config(page_title="Jämförelse: Leverans vs Faktura", layout="centered")
 st.title("🧠 Orderkontrollsystem")
 
-tabs = st.tabs(["📄 Kontroll Pressglass", "🧠 Ordergranskning", "📚 Rapporthistorik"])
+tabs = st.tabs(["📄 Kontroll Pressglass", "🧠 Ordergranskning", "📚 Rapporthistorik", "✅ Granskade ordrar"])
 
 with tabs[0]:
     st.info("Ladda upp leveransbekräftelse och faktura som PDF.")
@@ -158,8 +160,17 @@ with tabs[1]:
         if not anomalies:
             st.success("Ingen tydlig avvikelse hittad.")
         else:
+            feedback_list = []
             for i, anomaly in enumerate(anomalies):
                 feedback = st.radio(f"'{anomaly['Text']}' – Förväntat: '{anomaly['Förväntat']}'", ["OK", "EJ OK"], key=f"pdf_feedback_{i}")
+                feedback_list.append((anomaly, feedback))
+            if st.button("✔️ Klar"):
+                filename = os.path.splitext(order_pdf.name)[0] + "_granskning.txt"
+                filepath = os.path.join(REVIEWED_DIR, filename)
+                with open(filepath, "w", encoding="utf-8") as f:
+                    for anomaly, response in feedback_list:
+                        f.write(f"{anomaly['Text']} – Förväntat: {anomaly['Förväntat']} – Status: {response}\n")
+                st.success("Granskningen är sparad.")
 
 with tabs[2]:
     st.info("Tidigare jämförelser som PDF.")
@@ -168,3 +179,11 @@ with tabs[2]:
         filepath = os.path.join(HISTORY_DIR, file)
         with open(filepath, "rb") as f:
             st.download_button(file, data=f, file_name=file, key=file)
+
+with tabs[3]:
+    st.info("Sparade granskningar.")
+    reviewed_files = sorted(os.listdir(REVIEWED_DIR), reverse=True)
+    for file in reviewed_files:
+        filepath = os.path.join(REVIEWED_DIR, file)
+        with open(filepath, "r", encoding="utf-8") as f:
+            st.text(f"{file}\n{'-'*len(file)}\n{f.read()}\n")
