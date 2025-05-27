@@ -14,7 +14,7 @@ os.makedirs(HISTORY_DIR, exist_ok=True)
 os.makedirs(REVIEWED_DIR, exist_ok=True)
 
 # --- MÅSTE KOMMA FÖRST ---
-st.set_page_config(page_title="Jämförelse: Leverans vs Faktura", layout="wide")
+st.set_page_config(page_title="Jämförelse: Leverans vs Faktura", layout="centered")
 
 # --- GLOBAL CSS FÖR SCROLL ---
 st.markdown("""
