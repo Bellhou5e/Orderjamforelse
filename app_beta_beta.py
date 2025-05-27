@@ -103,7 +103,7 @@ def kontroll_pressglass():
     with col1:
         conf_file = st.file_uploader("Ladda upp leveransbekräftelse", type="pdf", key="conf")
     with col2:
-        fakt_file = st.file_uploader("Ladda upp fakturan", type="pdf", key="fakt")
+        fakt_file = st.file_uploader("Ladda upp faktura", type="pdf", key="fakt")
 
     result_container = st.container()
     if conf_file and fakt_file:
