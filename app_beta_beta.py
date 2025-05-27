@@ -209,7 +209,7 @@ def testyta():
     st.warning("Detta är en testyta för framtida funktioner. Här kan du experimentera utan att påverka något annat.")
 
 # --- STREAMLIT GRÄNSSNITT ---
-st.set_page_config(page_title="Jämförelse: Leverans vs Faktura", layout="wide")
+st.set_page_config(page_title="Jämförelse: Leverans vs Faktura", layout="centered")
 st.title("🧠 Orderkontrollsystem")
 
 main_tabs = st.tabs(["📦 Kontroll Pressglass", "🧾 Orderkontroll", "🧪 Testyta"])
