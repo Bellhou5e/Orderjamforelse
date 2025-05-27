@@ -108,29 +108,40 @@ def extract_text_blocks_from_pdf(pdf_file):
     return lines
 
 def detect_pdf_anomalies(text_lines):
-    label_groups = defaultdict(list)
+    blocks = []
+    block = []
     for line in text_lines:
-        if any(key in line.lower() for key in ["vit", "röd", "spröjs", "utan spröjs", "svart"]):
-            label_groups[line.strip()].append(line.strip())
+        if re.match(r"Rad\s*\d+", line):
+            if block:
+                blocks.append(block)
+            block = [line]
+        else:
+            block.append(line)
+    if block:
+        blocks.append(block)
 
     anomaly_report = []
-    all_values = [key for key in label_groups.keys()]
-    if len(all_values) > 1:
-        common = max(label_groups, key=lambda k: len(label_groups[k]))
-        for val in all_values:
-            if val != common:
+    colors = [line for group in blocks for line in group if any(color in line.lower() for color in ["vit", "röd", "svart"])]
+    common_color = max(set(colors), key=colors.count) if colors else None
+
+    for block in blocks:
+        color_lines = [line for line in block if any(color in line.lower() for color in ["vit", "röd", "svart"])]
+        for color in color_lines:
+            if color != common_color:
+                header = f"{block[0]} - {next((l for l in block if 'AF' in l or 'AVF' in l), '')}"
                 anomaly_report.append({
-                    "Text": val,
-                    "Förväntat": common,
-                    "Status": "Ej OK"
+                    "Header": header,
+                    "Detaljer": [l for l in block[1:] if l != color],
+                    "Avvikelse": color,
+                    "Förväntat": common_color
                 })
     return anomaly_report
 
 # --- STREAMLIT GRÄNSSNITT ---
-st.set_page_config(page_title="Jämförelse: Leverans vs Faktura", layout="centered")
+st.set_page_config(page_title="Jämförelse: Leverans vs Faktura", layout="wide")
 st.title("🧠 Orderkontrollsystem")
 
-tabs = st.tabs(["📄 Kontroll Pressglass", "🧠 Ordergranskning", "📚 Rapporthistorik", "✅ Granskade ordrar"])
+tabs = st.tabs(["📦 Kontroll Pressglass", "📚 Rapporthistorik", "🧾 Orderkontroll", "✅ Granskade ordrar"])
 
 with tabs[0]:
     st.info("Ladda upp leveransbekräftelse och faktura som PDF.")
@@ -144,13 +155,21 @@ with tabs[0]:
             df = compare_orders(confirmation_orders, faktura_orders)
             leverans_id = os.path.splitext(conf_file.name)[0]
             st.success("Jämförelsen är klar!")
-            st.dataframe(df, use_container_width=True, height=600)
+            st.dataframe(df, use_container_width=True, height=700)
 
             saved_path = generate_pdf_report(df, faktura_id or "Faktura", leverans_id)
             with open(saved_path, "rb") as f:
                 st.download_button("🔗 Ladda ner PDF-rapport", data=f, file_name=os.path.basename(saved_path))
 
 with tabs[1]:
+    st.info("Tidigare jämförelser som PDF.")
+    history_files = sorted(os.listdir(HISTORY_DIR), reverse=True)
+    for file in history_files:
+        filepath = os.path.join(HISTORY_DIR, file)
+        with open(filepath, "rb") as f:
+            st.download_button(file, data=f, file_name=file, key=file)
+
+with tabs[2]:
     st.info("Ladda upp en order som PDF med information om fönster, färg, spröjs etc.")
     order_pdf = st.file_uploader("Order (PDF)", type="pdf", key="order_pdf")
     if order_pdf:
@@ -162,23 +181,19 @@ with tabs[1]:
         else:
             feedback_list = []
             for i, anomaly in enumerate(anomalies):
-                feedback = st.radio(f"'{anomaly['Text']}' – Förväntat: '{anomaly['Förväntat']}'", ["OK", "EJ OK"], key=f"pdf_feedback_{i}")
-                feedback_list.append((anomaly, feedback))
+                st.markdown(f"**{anomaly['Header']}**")
+                for detail in anomaly['Detaljer']:
+                    st.markdown(f"<p style='margin:0 0 2px 10px;'>{detail}</p>", unsafe_allow_html=True)
+                response = st.radio("Status", ["OK", "EJ OK"], key=f"feedback_{i}")
+                feedback_list.append((anomaly, response))
+                st.markdown("---")
             if st.button("✔️ Klar"):
                 filename = os.path.splitext(order_pdf.name)[0] + "_granskning.txt"
                 filepath = os.path.join(REVIEWED_DIR, filename)
                 with open(filepath, "w", encoding="utf-8") as f:
                     for anomaly, response in feedback_list:
-                        f.write(f"{anomaly['Text']} – Förväntat: {anomaly['Förväntat']} – Status: {response}\n")
+                        f.write(f"{anomaly['Header']} – {anomaly['Avvikelse']} – Förväntat: {anomaly['Förväntat']} – Status: {response}\n")
                 st.success("Granskningen är sparad.")
-
-with tabs[2]:
-    st.info("Tidigare jämförelser som PDF.")
-    history_files = sorted(os.listdir(HISTORY_DIR), reverse=True)
-    for file in history_files:
-        filepath = os.path.join(HISTORY_DIR, file)
-        with open(filepath, "rb") as f:
-            st.download_button(file, data=f, file_name=file, key=file)
 
 with tabs[3]:
     st.info("Sparade granskningar.")
