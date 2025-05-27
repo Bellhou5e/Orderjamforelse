@@ -15,6 +15,7 @@ os.makedirs(REVIEWED_DIR, exist_ok=True)
 
 # --- FUNKTION: Kontroll Pressglass ---
 def kontroll_pressglass():
+    # Anpassad layout enligt skiss
     def extract_orders_from_confirmation(pdf_file):
         from PyPDF2 import PdfReader
         reader = PdfReader(pdf_file)
@@ -99,17 +100,26 @@ def kontroll_pressglass():
         return filepath
 
     st.info("Ladda upp leveransbekräftelse och faktura som PDF.")
+    col1, col2 = st.columns(2)
+    with col1:
+        conf_file = st.file_uploader("Ladda upp 1", type="pdf", key="conf")
+    with col2:
+        fakt_file = st.file_uploader("Ladda upp 2", type="pdf", key="fakt")
+
+    compare_col = st.columns([1, 9])[0]
+    result_container = st.container()
     conf_file = st.file_uploader("Leveransbekräftelse (PDF)", type="pdf")
     fakt_file = st.file_uploader("Faktura (PDF)", type="pdf")
 
     if conf_file and fakt_file:
-        if st.button("✅ Jämför dokument"):
+        if compare_col.button("Jämför"):
             confirmation_orders = extract_orders_from_confirmation(conf_file)
             faktura_orders, faktura_id = extract_orders_from_invoice(fakt_file)
             df = compare_orders(confirmation_orders, faktura_orders)
             leverans_id = os.path.splitext(conf_file.name)[0]
             st.success("Jämförelsen är klar!")
-            st.dataframe(df, use_container_width=True, height=700)
+            with result_container:
+                st.dataframe(df, use_container_width=True, height=700)
 
             saved_path = generate_pdf_report(df, faktura_id or "Faktura", leverans_id)
             with open(saved_path, "rb") as f:
