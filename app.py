@@ -5,7 +5,11 @@ from collections import defaultdict
 from fpdf import FPDF
 import io
 import re
+import os
+from datetime import datetime
 
+HISTORY_DIR = "rapporthistorik"
+os.makedirs(HISTORY_DIR, exist_ok=True)
 
 def extract_orders_from_confirmation(pdf_file):
     from PyPDF2 import PdfReader
@@ -27,9 +31,14 @@ def extract_orders_from_confirmation(pdf_file):
 
 def extract_orders_from_invoice(pdf_file):
     orders = defaultdict(int)
+    invoice_id = ""
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
             lines = page.extract_text().split("\n")
+            for line in lines:
+                match = re.search(r"Faktura(?:nr|nummer)[:\s]*([\w\d-]+)", line, re.IGNORECASE)
+                if match:
+                    invoice_id = match.group(1)
             current_order = None
             for line in reversed(lines):
                 order_match = re.search(r"Order[:\/\-]?\s*(\d{7})", line)
@@ -43,7 +52,7 @@ def extract_orders_from_invoice(pdf_file):
                             orders[current_order] += qty
                         except ValueError:
                             pass
-    return orders
+    return orders, invoice_id
 
 def compare_orders(confirmation, invoice):
     all_orders = set(confirmation.keys()) | set(invoice.keys())
@@ -59,7 +68,7 @@ def compare_orders(confirmation, invoice):
         })
     return pd.DataFrame(result)
 
-def generate_pdf_report(df):
+def generate_pdf_report(df, faktura_id, leverans_id):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
@@ -80,25 +89,39 @@ def generate_pdf_report(df):
         pdf.cell(col_widths[2], 10, str(row["Antal (Faktura)"]), 1)
         pdf.cell(col_widths[3], 10, row["Matchar?"], 1)
         pdf.ln()
-    output_bytes = pdf.output(dest='S').encode('latin1')
-    return io.BytesIO(output_bytes)
+    filename = f"{faktura_id}-{leverans_id}-{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+    filepath = os.path.join(HISTORY_DIR, filename)
+    pdf.output(filepath)
+    return filepath
 
 # Streamlit-gränssnitt
 st.set_page_config(page_title="Jämförelse: Leverans vs Faktura", layout="centered")
-st.title("📝 Orderjämförelse: Leveransbekräftelse vs Faktura")
+st.title("📝 Orderjämförelse")
 
-st.info("Ladda upp leveransbekräftelse och faktura som PDF.")
+tabs = st.tabs(["📄 Kontroll", "📚 Rapporthistorik"])
 
-conf_file = st.file_uploader("Leveransbekräftelse (PDF)", type="pdf")
-fakt_file = st.file_uploader("Faktura (PDF)", type="pdf")
+with tabs[0]:
+    st.info("Ladda upp leveransbekräftelse och faktura som PDF.")
+    conf_file = st.file_uploader("Leveransbekräftelse (PDF)", type="pdf")
+    fakt_file = st.file_uploader("Faktura (PDF)", type="pdf")
 
-if conf_file and fakt_file:
-    if st.button("✅ Jämför dokument"):
-        confirmation_orders = extract_orders_from_confirmation(conf_file)
-        faktura_orders = extract_orders_from_invoice(fakt_file)
-        df = compare_orders(confirmation_orders, faktura_orders)
-        st.success("Jämförelsen är klar!")
-        st.dataframe(df, use_container_width=True, height=600)
+    if conf_file and fakt_file:
+        if st.button("✅ Jämför dokument"):
+            confirmation_orders = extract_orders_from_confirmation(conf_file)
+            faktura_orders, faktura_id = extract_orders_from_invoice(fakt_file)
+            df = compare_orders(confirmation_orders, faktura_orders)
+            leverans_id = os.path.splitext(conf_file.name)[0]
+            st.success("Jämförelsen är klar!")
+            st.dataframe(df, use_container_width=True, height=600)
 
-        pdf_buf = generate_pdf_report(df)
-        st.download_button("🔗 Ladda ner PDF-rapport", data=pdf_buf, file_name="jamforelse.pdf")
+            saved_path = generate_pdf_report(df, faktura_id or "Faktura", leverans_id)
+            with open(saved_path, "rb") as f:
+                st.download_button("🔗 Ladda ner PDF-rapport", data=f, file_name=os.path.basename(saved_path))
+
+with tabs[1]:
+    st.info("Tidigare jämförelser som PDF.")
+    history_files = sorted(os.listdir(HISTORY_DIR), reverse=True)
+    for file in history_files:
+        filepath = os.path.join(HISTORY_DIR, file)
+        with open(filepath, "rb") as f:
+            st.download_button(file, data=f, file_name=file, key=file)
