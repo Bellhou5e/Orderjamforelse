@@ -11,6 +11,7 @@ from datetime import datetime
 HISTORY_DIR = "rapporthistorik"
 os.makedirs(HISTORY_DIR, exist_ok=True)
 
+# --- PRESSGLASS ---
 def extract_orders_from_confirmation(pdf_file):
     from PyPDF2 import PdfReader
     reader = PdfReader(pdf_file)
@@ -94,11 +95,40 @@ def generate_pdf_report(df, faktura_id, leverans_id):
     pdf.output(filepath)
     return filepath
 
-# Streamlit-gränssnitt
-st.set_page_config(page_title="Jämförelse: Leverans vs Faktura", layout="centered")
-st.title("📝 Orderjämförelse")
+# --- PDF AVVIKELSEANALYS ---
+def extract_text_blocks_from_pdf(pdf_file):
+    with pdfplumber.open(pdf_file) as pdf:
+        lines = []
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                lines.extend(text.splitlines())
+    return lines
 
-tabs = st.tabs(["📄 Kontroll", "📚 Rapporthistorik"])
+def detect_pdf_anomalies(text_lines):
+    label_groups = defaultdict(list)
+    for line in text_lines:
+        if any(key in line.lower() for key in ["vit", "röd", "spröjs", "utan spröjs", "svart"]):
+            label_groups[line.strip()].append(line.strip())
+
+    anomaly_report = []
+    all_values = [key for key in label_groups.keys()]
+    if len(all_values) > 1:
+        common = max(label_groups, key=lambda k: len(label_groups[k]))
+        for val in all_values:
+            if val != common:
+                anomaly_report.append({
+                    "Text": val,
+                    "Förväntat": common,
+                    "Status": "Ej OK"
+                })
+    return anomaly_report
+
+# --- STREAMLIT GRÄNSSNITT ---
+st.set_page_config(page_title="Jämförelse: Leverans vs Faktura", layout="centered")
+st.title("🧠 Orderkontrollsystem")
+
+tabs = st.tabs(["📄 Kontroll Pressglass", "🧠 Ordergranskning", "📚 Rapporthistorik"])
 
 with tabs[0]:
     st.info("Ladda upp leveransbekräftelse och faktura som PDF.")
@@ -119,9 +149,28 @@ with tabs[0]:
                 st.download_button("🔗 Ladda ner PDF-rapport", data=f, file_name=os.path.basename(saved_path))
 
 with tabs[1]:
+    st.info("Ladda upp en order som PDF med information om fönster, färg, spröjs etc.")
+    order_pdf = st.file_uploader("Order (PDF)", type="pdf", key="order_pdf")
+    if order_pdf:
+        lines = extract_text_blocks_from_pdf(order_pdf)
+        st.write("Extraherad text:")
+        st.text("\n".join(lines))
+
+        st.subheader("🔍 Avvikelseanalys")
+        anomalies = detect_pdf_anomalies(lines)
+        if not anomalies:
+            st.success("Ingen tydlig avvikelse hittad.")
+        else:
+            st.warning("Följande potentiella avvikelser hittades:")
+            for i, anomaly in enumerate(anomalies):
+                st.markdown(f"🟥 **Text:** '{anomaly['Text']}' – (Förväntat: '{anomaly['Förväntat']}')")
+                feedback = st.radio("Bekräfta status", ["OK", "EJ OK"], key=f"pdf_feedback_{i}")
+
+with tabs[2]:
     st.info("Tidigare jämförelser som PDF.")
     history_files = sorted(os.listdir(HISTORY_DIR), reverse=True)
     for file in history_files:
         filepath = os.path.join(HISTORY_DIR, file)
         with open(filepath, "rb") as f:
             st.download_button(file, data=f, file_name=file, key=file)
+
