@@ -15,7 +15,6 @@ os.makedirs(REVIEWED_DIR, exist_ok=True)
 
 # --- FUNKTION: Kontroll Pressglass ---
 def kontroll_pressglass():
-    # Anpassad layout enligt skiss
     def extract_orders_from_confirmation(pdf_file):
         from PyPDF2 import PdfReader
         reader = PdfReader(pdf_file)
@@ -106,18 +105,9 @@ def kontroll_pressglass():
     with col2:
         fakt_file = st.file_uploader("Ladda upp 2", type="pdf", key="fakt")
 
-    compare_col = st.columns([1, 9])[0]
     result_container = st.container()
-    
-    
-
     if conf_file and fakt_file:
-        st.markdown("""
-            <div style='margin-top: 10px;'>
-                <button style='background-color:#28a745;color:white;padding:10px 20px;border:none;border-radius:5px;font-weight:bold;'>Jämför</button>
-            </div>
-        """, unsafe_allow_html=True)
-        if compare_col.button("Jämför"):
+        if st.button("✅ Jämför dokument"):
             confirmation_orders = extract_orders_from_confirmation(conf_file)
             faktura_orders, faktura_id = extract_orders_from_invoice(fakt_file)
             df = compare_orders(confirmation_orders, faktura_orders)
@@ -176,4 +166,5 @@ with main_tabs[1]:
     with sub_tabs2[1]:
         granskade_ordrar()
 
-
+with main_tabs[2]:
+    testyta()
