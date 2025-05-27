@@ -98,7 +98,7 @@ if conf_file and fakt_file:
         faktura_orders = extract_orders_from_invoice(fakt_file)
         df = compare_orders(confirmation_orders, faktura_orders)
         st.success("Jämförelsen är klar!")
-        st.dataframe(df)
+        st.dataframe(df, use_container_width=True, height=600)
 
         pdf_buf = generate_pdf_report(df)
         st.download_button("🔗 Ladda ner PDF-rapport", data=pdf_buf, file_name="jamforelse.pdf")
