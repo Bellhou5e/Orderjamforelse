@@ -139,32 +139,6 @@ def rapporthistorik():
         with open(filepath, "rb") as f:
             st.download_button(file, data=f, file_name=file, key=file)
 
-def orderkontroll():
-    st.info("Ladda upp en order som PDF med information om fönster, färg, spröjs etc.")
-    order_pdf = st.file_uploader("Order (PDF)", type="pdf", key="order_pdf")
-    if order_pdf:
-        lines = extract_text_blocks_from_pdf(order_pdf)
-        st.subheader("🔍 Avvikelseanalys")
-        anomalies = detect_pdf_anomalies(lines)
-        if not anomalies:
-            st.success("Ingen tydlig avvikelse hittad.")
-        else:
-            feedback_list = []
-            for i, anomaly in enumerate(anomalies):
-                st.markdown(f"**{anomaly['Header']}**")
-                for detail in anomaly['Detaljer']:
-                    st.markdown(f"<p style='margin:0 0 2px 10px;'>{detail}</p>", unsafe_allow_html=True)
-                response = st.radio("Status", ["OK", "EJ OK"], key=f"feedback_{i}")
-                feedback_list.append((anomaly, response))
-                st.markdown("---")
-            if st.button("✔️ Klar"):
-                filename = os.path.splitext(order_pdf.name)[0] + "_granskning.txt"
-                filepath = os.path.join(REVIEWED_DIR, filename)
-                with open(filepath, "w", encoding="utf-8") as f:
-                    for anomaly, response in feedback_list:
-                        f.write(f"{anomaly['Header']} – {anomaly['Avvikelse']} – Förväntat: {anomaly['Förväntat']} – Status: {response}\n")
-                st.success("Granskningen är sparad.")
-
 def extract_text_blocks_from_pdf(pdf_file):
     with pdfplumber.open(pdf_file) as pdf:
         lines = []
@@ -192,4 +166,73 @@ def detect_pdf_anomalies(text_lines):
     common_color = max(set(colors), key=colors.count) if colors else None
 
     for block in blocks:
-        color_lines
+        color_lines = [line for line in block if any(color in line.lower() for color in ["vit", "röd", "svart"])]
+        for color in color_lines:
+            if color != common_color:
+                header = f"{block[0]} - {next((l for l in block if 'AF' in l or 'AVF' in l), '')}"
+                anomaly_report.append({
+                    "Header": header,
+                    "Detaljer": [l for l in block[1:] if l != color],
+                    "Avvikelse": color,
+                    "Förväntat": common_color
+                })
+    return anomaly_report
+
+def orderkontroll():
+    st.info("Ladda upp en order som PDF med information om fönster, färg, spröjs etc.")
+    order_pdf = st.file_uploader("Order (PDF)", type="pdf", key="order_pdf")
+    if order_pdf:
+        lines = extract_text_blocks_from_pdf(order_pdf)
+        st.subheader("🔍 Avvikelseanalys")
+        anomalies = detect_pdf_anomalies(lines)
+        if not anomalies:
+            st.success("Ingen tydlig avvikelse hittad.")
+        else:
+            feedback_list = []
+            for i, anomaly in enumerate(anomalies):
+                st.markdown(f"**{anomaly['Header']}**")
+                for detail in anomaly['Detaljer']:
+                    st.markdown(f"<p style='margin:0 0 2px 10px;'>{detail}</p>", unsafe_allow_html=True)
+                response = st.radio("Status", ["OK", "EJ OK"], key=f"feedback_{i}")
+                feedback_list.append((anomaly, response))
+                st.markdown("---")
+            if st.button("✔️ Klar"):
+                filename = os.path.splitext(order_pdf.name)[0] + "_granskning.txt"
+                filepath = os.path.join(REVIEWED_DIR, filename)
+                with open(filepath, "w", encoding="utf-8") as f:
+                    for anomaly, response in feedback_list:
+                        f.write(f"{anomaly['Header']} – {anomaly['Avvikelse']} – Förväntat: {anomaly['Förväntat']} – Status: {response}\n")
+                st.success("Granskningen är sparad.")
+
+def granskade_ordrar():
+    st.info("Sparade granskningar.")
+    reviewed_files = sorted(os.listdir(REVIEWED_DIR), reverse=True)
+    for file in reviewed_files:
+        filepath = os.path.join(REVIEWED_DIR, file)
+        with open(filepath, "r", encoding="utf-8") as f:
+            st.text(f"{file}\n{'-'*len(file)}\n{f.read()}\n")
+
+def testyta():
+    st.warning("Detta är en testyta för framtida funktioner. Här kan du experimentera utan att påverka något annat.")
+
+# Huvudgränssnitt
+st.title("🧠 Orderkontrollsystem")
+
+main_tabs = st.tabs(["📦 Kontroll Pressglass", "🧾 Orderkontroll", "🧪 Testyta"])
+
+with main_tabs[0]:
+    sub_tabs = st.tabs(["Jämförelse", "Rapporthistorik"])
+    with sub_tabs[0]:
+        kontroll_pressglass()
+    with sub_tabs[1]:
+        rapporthistorik()
+
+with main_tabs[1]:
+    sub_tabs2 = st.tabs(["Granskning", "Granskade ordrar"])
+    with sub_tabs2[0]:
+        orderkontroll()
+    with sub_tabs2[1]:
+        granskade_ordrar()
+
+with main_tabs[2]:
+    testyta()
