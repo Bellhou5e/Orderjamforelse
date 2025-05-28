@@ -84,19 +84,22 @@ def kontroll_pressglass():
                     if faktura_id_match:
                         invoice_id = faktura_id_match.group(1)
 
+                    # Ordernummer hittas
                     order_match = re.search(r"Zamówienie\s*/\s*Order:\s*(\d{7})", line)
                     if order_match:
                         current_order = order_match.group(1)
                         continue
 
+                    # Kvantitet matchning
                     qty_match = re.search(r"P\s+(\d+(?:[.,]\d+)?)\s*pcs", line, re.IGNORECASE)
-                    if current_order and qty_match:
-                        try:
-                            qty = int(float(qty_match.group(1).replace(",", ".")))
-                            if 0 < qty < 500:
-                                orders[current_order] += qty
-                        except ValueError:
-                            continue
+                    if qty_match:
+                        if current_order:
+                            try:
+                                qty = int(float(qty_match.group(1).replace(",", ".")))
+                                if 0 < qty < 500:
+                                    orders[current_order] += qty
+                            except ValueError:
+                                continue
         return orders, invoice_id
 
     def compare_orders(confirmation, invoice):
