@@ -31,7 +31,6 @@ def kontroll_pressglass():
     reader = PdfReader(pdf_file)
     text = "\n".join(page.extract_text() for page in reader.pages)
     lines = text.splitlines()
-
     orders = defaultdict(int)
     for line in lines:
         # Specialfall: Reorder
