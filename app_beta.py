@@ -33,25 +33,43 @@ def kontroll_pressglass():
         lines = text.splitlines()
 
         orders = defaultdict(int)
-        for line in lines:
+        previous_order = None
+
+        for i, line in enumerate(lines):
             reorder_match = re.search(r"Reorder\s+(\d{7})", line)
-            qty_match = re.search(r"(\d{1,3})\s*$", line)
-            if reorder_match and qty_match:
+            if reorder_match:
                 order_number = reorder_match.group(1)
+                qty_match = re.search(r"(\d{1,3})\s*$", line)
+                if qty_match:
+                    try:
+                        qty = int(qty_match.group(1))
+                        if 0 < qty < 500:
+                            orders[order_number] += qty
+                    except ValueError:
+                        continue
+                continue
+
+            parts = line.strip().split()
+            if len(parts) >= 6:
+                possible_order = parts[3]
                 try:
-                    qty = int(qty_match.group(1))
-                    if 0 < qty < 500:
-                        orders[order_number] += qty
+                    qty = int(parts[-1])
+                    if re.fullmatch(r"\d{7}", possible_order) and 0 < qty < 500:
+                        orders[possible_order] += qty
+                        previous_order = possible_order
+                        continue
                 except ValueError:
                     continue
-            else:
-                parts = line.strip().split()
-                if len(parts) >= 6:
-                    possible_order = parts[3]
+
+            # Extra fallback: om föregående rad var ordernummer och denna rad är bara ett tal
+            if previous_order:
+                fallback_qty_match = re.fullmatch(r"\s*(\d{1,3})\s*", line)
+                if fallback_qty_match:
                     try:
-                        qty = int(parts[-1])
-                        if re.fullmatch(r"\d{7}", possible_order) and 0 < qty < 500:
-                            orders[possible_order] += qty
+                        qty = int(fallback_qty_match.group(1))
+                        if 0 < qty < 500:
+                            orders[previous_order] += qty
+                            previous_order = None
                     except ValueError:
                         continue
         return orders
