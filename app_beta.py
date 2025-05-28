@@ -75,7 +75,6 @@ def kontroll_pressglass():
         orders = defaultdict(int)
         current_order = None
         invoice_id = ""
-        awaiting_qty = False
 
         with pdfplumber.open(pdf_file) as pdf:
             for page in pdf.pages:
@@ -88,35 +87,16 @@ def kontroll_pressglass():
                     order_match = re.search(r"Zamówienie\s*/\s*Order:\s*(\d{7})", line)
                     if order_match:
                         current_order = order_match.group(1)
-                        awaiting_qty = True
-                        continue
-
-                    # Avbryt om annan orderrubrik dyker upp
-                    if "Zamówienie / Order" in line and not order_match:
-                        current_order = None
-                        awaiting_qty = False
-                        continue
-
-                    # Bryt om nästa order dyker upp
-                    if re.search(r"Zamówienie\s*/\s*Order:\s*(\d{7})", line):
-                        current_order = None
-                        awaiting_qty = False
                         continue
 
                     qty_match = re.search(r"P\s+(\d+(?:[.,]\d+)?)\s*pcs", line, re.IGNORECASE)
-                    if current_order and qty_match and awaiting_qty:
+                    if current_order and qty_match:
                         try:
                             qty = int(float(qty_match.group(1).replace(",", ".")))
                             if 0 < qty < 500:
                                 orders[current_order] += qty
                         except ValueError:
                             continue
-                        awaiting_qty = False  # Endast första kvantitet räknas direkt efter order
-                    elif qty_match:
-                        continue
-
-                    if not qty_match:
-                        awaiting_qty = False
         return orders, invoice_id
 
     def compare_orders(confirmation, invoice):
