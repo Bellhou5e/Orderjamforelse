@@ -91,8 +91,14 @@ def kontroll_pressglass():
                         awaiting_qty = True
                         continue
 
-                    # Om vi når en annan orderrad utan nummer, nollställ för säkerhets skull
+                    # Avbryt om annan orderrubrik dyker upp
                     if "Zamówienie / Order" in line and not order_match:
+                        current_order = None
+                        awaiting_qty = False
+                        continue
+
+                    # Bryt om nästa order dyker upp
+                    if re.search(r"Zamówienie\s*/\s*Order:\s*(\d{7})", line):
                         current_order = None
                         awaiting_qty = False
                         continue
@@ -105,11 +111,10 @@ def kontroll_pressglass():
                                 orders[current_order] += qty
                         except ValueError:
                             continue
+                        awaiting_qty = False  # Endast första kvantitet räknas direkt efter order
                     elif qty_match:
-                        # Om en kvantitet hittas utan en aktiv order – ignorera
                         continue
 
-                    # Om raden inte har kvantitet, sluta vänta
                     if not qty_match:
                         awaiting_qty = False
         return orders, invoice_id
