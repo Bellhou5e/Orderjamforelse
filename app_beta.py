@@ -41,8 +41,10 @@ def kontroll_pressglass():
             for i, part in enumerate(parts):
                 if re.fullmatch(r"\d{7}", part):
                     try:
-                        qty = int(parts[-1])
-                        orders[part] += qty
+                        qty_candidates = [p for p in parts[i+1:] if re.fullmatch(r"\d+", p)]
+                        if qty_candidates:
+                            qty = int(qty_candidates[0])
+                            orders[part] += qty
                     except (ValueError, IndexError):
                         pass
         return orders
