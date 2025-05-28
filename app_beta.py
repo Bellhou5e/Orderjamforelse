@@ -35,24 +35,23 @@ def kontroll_pressglass():
         orders = defaultdict(int)
         for line in lines:
             reorder_match = re.search(r"Reorder\s+(\d{7})", line)
-            qty_match = re.search(r"(\d+)$", line)
+            qty_match = re.search(r"(\d{1,3})\s*$", line)
             if reorder_match and qty_match:
                 order_number = reorder_match.group(1)
                 try:
                     qty = int(qty_match.group(1))
-                    if qty < 1000:
+                    if 0 < qty < 500:
                         orders[order_number] += qty
                 except ValueError:
                     continue
             else:
-                line_match = re.search(r"(\d{7})", line)
-                qty_match = re.findall(r"(\d+)$", line)
-                if line_match and qty_match:
-                    order_number = line_match.group(1)
+                parts = line.strip().split()
+                if len(parts) >= 6:
+                    possible_order = parts[3]
                     try:
-                        qty = int(qty_match[0])
-                        if qty < 1000:
-                            orders[order_number] += qty
+                        qty = int(parts[-1])
+                        if re.fullmatch(r"\d{7}", possible_order) and 0 < qty < 500:
+                            orders[possible_order] += qty
                     except ValueError:
                         continue
         return orders
@@ -75,7 +74,8 @@ def kontroll_pressglass():
                     if current_order and qty_match:
                         try:
                             qty = int(float(qty_match.group(1).replace(",", ".")))
-                            orders[current_order] += qty
+                            if 0 < qty < 500:
+                                orders[current_order] += qty
                         except ValueError:
                             continue
         return orders, invoice_id
