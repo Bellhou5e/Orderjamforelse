@@ -45,7 +45,8 @@ def kontroll_pressglass():
                 qty_match = re.findall(r"(\d+)$", line)
                 if line_match and qty_match:
                     order_number = line_match.group(1)
-                    qty = int(qty_match[0])
+                qty = int(qty_match[0])
+                if qty < 1000:  # uteslut felslag
                     orders[order_number] += qty
         return orders
 
