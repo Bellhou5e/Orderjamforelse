@@ -73,27 +73,29 @@ def kontroll_pressglass():
 
     def extract_orders_from_invoice(pdf_file):
         orders = defaultdict(int)
-        current_order = None
         invoice_id = ""
 
         with pdfplumber.open(pdf_file) as pdf:
             for page in pdf.pages:
                 lines = page.extract_text().split("\n")
-                for line in lines:
-                    faktura_id_match = re.search(r"Faktura(?:nr|nummer)[:\s]*([\w\d-]+)", line, re.IGNORECASE)
-                    if faktura_id_match:
-                        invoice_id = faktura_id_match.group(1)
+                order_indices = []
+                invoice_id_match = re.search(r"Faktura(?:nr|nummer)[:\s]*([\w\d-]+)", " ".join(lines), re.IGNORECASE)
+                if invoice_id_match:
+                    invoice_id = invoice_id_match.group(1)
 
-                    # Ordernummer hittas
-                    order_match = re.search(r"Zamówienie\s*/\s*Order:\s*(\d{7})", line)
-                    if order_match:
-                        current_order = order_match.group(1)
-                        continue
+                for idx, line in enumerate(lines):
+                    match = re.search(r"Zamówienie\s*/\s*Order:\s*(\d{7})", line)
+                    if match:
+                        order_indices.append((idx, match.group(1)))
 
-                    # Kvantitet matchning
-                    qty_match = re.search(r"P\s+(\d+(?:[.,]\d+)?)\s*pcs", line, re.IGNORECASE)
-                    if qty_match:
-                        if current_order:
+                order_indices.append((len(lines), None))
+
+                for i in range(len(order_indices) - 1):
+                    start, current_order = order_indices[i]
+                    end, _ = order_indices[i + 1]
+                    for j in range(start + 1, end):
+                        qty_match = re.search(r"P\s+(\d+(?:[.,]\d+)?)\s*pcs", lines[j], re.IGNORECASE)
+                        if qty_match:
                             try:
                                 qty = int(float(qty_match.group(1).replace(",", ".")))
                                 if 0 < qty < 500:
