@@ -141,7 +141,7 @@ def kontroll_pressglass():
             saved_path = generate_pdf_report(df, faktura_id or "Faktura", leverans_id)
             with open(saved_path, "rb") as f:
                 st.download_button("🔗 Ladda ner PDF-rapport", data=f, file_name=os.path.basename(saved_path))
-
+                
 def rapporthistorik():
     st.info("Tidigare jämförelser som PDF.")
     history_files = sorted(os.listdir(HISTORY_DIR), reverse=True)
