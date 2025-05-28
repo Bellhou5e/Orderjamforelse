@@ -32,7 +32,7 @@ def kontroll_pressglass():
     def extract_orders_from_confirmation(pdf_file):
         from PyPDF2 import PdfReader
         reader = PdfReader(pdf_file)
-        text = "\n".join(page.extract_text() for page in reader.pages)
+        text = "\n".join(page.extract_text() for page in reader.pages if page.extract_text())
         lines = text.splitlines()
 
         orders = defaultdict(int)
@@ -65,10 +65,11 @@ def kontroll_pressglass():
                     if order_match:
                         current_order = order_match.group(1)
                     elif current_order:
-                        qty_matches = re.findall(r"(\d+[\.,]?\d*)\s*(?:pcs|stk|st|szt)?", line, re.IGNORECASE)
+                        qty_matches = re.findall(r"(\d{1,3}(?:[ \.,]?\d{3})*|\d+)\s*(?:pcs|stk|st|szt)?", line)
                         for qty_str in qty_matches:
                             try:
-                                qty = int(float(qty_str.replace(",", ".")))
+                                normalized = qty_str.replace(".", "").replace(",", "").replace(" ", "")
+                                qty = int(normalized)
                                 orders[current_order] += qty
                             except ValueError:
                                 pass
