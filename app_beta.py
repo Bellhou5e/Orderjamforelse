@@ -38,16 +38,23 @@ def kontroll_pressglass():
             qty_match = re.search(r"(\d+)$", line)
             if reorder_match and qty_match:
                 order_number = reorder_match.group(1)
-                qty = int(qty_match.group(1))
-                orders[order_number] += qty
+                try:
+                    qty = int(qty_match.group(1))
+                    if qty < 1000:
+                        orders[order_number] += qty
+                except ValueError:
+                    continue
             else:
                 line_match = re.search(r"(\d{7})", line)
                 qty_match = re.findall(r"(\d+)$", line)
                 if line_match and qty_match:
                     order_number = line_match.group(1)
-                qty = int(qty_match[0])
-                if qty < 1000:  # uteslut felslag
-                    orders[order_number] += qty
+                    try:
+                        qty = int(qty_match[0])
+                        if qty < 1000:
+                            orders[order_number] += qty
+                    except ValueError:
+                        continue
         return orders
 
     def extract_orders_from_invoice(pdf_file):
@@ -66,10 +73,13 @@ def kontroll_pressglass():
                         current_order = order_match.group(1)
                     qty_match = re.search(r"P\s+(\d+(?:[.,]\d+)?)\s*pcs", line, re.IGNORECASE)
                     if current_order and qty_match:
-                        qty = int(float(qty_match.group(1).replace(",", ".")))
-                        orders[current_order] += qty
+                        try:
+                            qty = int(float(qty_match.group(1).replace(",", ".")))
+                            orders[current_order] += qty
+                        except ValueError:
+                            continue
         return orders, invoice_id
-        
+
     def compare_orders(confirmation, invoice):
         all_orders = set(confirmation.keys()) | set(invoice.keys())
         result = []
