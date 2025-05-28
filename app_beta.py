@@ -31,9 +31,9 @@ def kontroll_pressglass():
     reader = PdfReader(pdf_file)
     text = "\n".join(page.extract_text() for page in reader.pages)
     lines = text.splitlines()
+
     orders = defaultdict(int)
     for line in lines:
-        # Specialfall: Reorder
         reorder_match = re.search(r"Reorder\s+(\d{7})", line)
         qty_match = re.search(r"(\d+)$", line)
         if reorder_match and qty_match:
@@ -41,7 +41,6 @@ def kontroll_pressglass():
             qty = int(qty_match.group(1))
             orders[order_number] += qty
         else:
-            # Vanlig rad: hämta 7-siffrigt ordernummer + kvantitet sist på raden
             line_match = re.search(r"(\d{7})", line)
             qty_match = re.findall(r"(\d+)$", line)
             if line_match and qty_match:
