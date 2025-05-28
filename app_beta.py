@@ -71,34 +71,38 @@ def kontroll_pressglass():
                         continue
         return orders
 
-    def extract_orders_from_invoice(pdf_file):
-        orders = defaultdict(int)
-        current_order = None
-        invoice_id = ""
-        with pdfplumber.open(pdf_file) as pdf:
-            for page in pdf.pages:
-                lines = page.extract_text().split("\n")
-                for line in lines:
-                    faktura_id_match = re.search(r"Faktura(?:nr|nummer)[:\s]*([\w\d-]+)", line, re.IGNORECASE)
-                    if faktura_id_match:
-                        invoice_id = faktura_id_match.group(1)
-                    order_match = re.search(r"Zamówienie\s*/\s*Order:\s*(\d{7})", line)
-                    if order_match:
-                        current_order = order_match.group(1)
-                        continue  # Stop processing further on this line
-                    elif re.search(r"Zamówienie\s*/\s*Order", line):
-                        current_order = None
-                        continue
+   def extract_orders_from_invoice(pdf_file):
+    orders = defaultdict(int)
+    current_order = None
+    invoice_id = ""
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            lines = page.extract_text().split("\n")
+            for line in lines:
+                faktura_id_match = re.search(r"Faktura(?:nr|nummer)[:\s]*([\w\d-]+)", line, re.IGNORECASE)
+                if faktura_id_match:
+                    invoice_id = faktura_id_match.group(1)
 
-                    qty_match = re.search(r"P\s+(\d+(?:[.,]\d+)?)\s*pcs", line, re.IGNORECASE)
-                    if current_order and qty_match:
-                        try:
-                            qty = int(float(qty_match.group(1).replace(",", ".")))
-                            if 0 < qty < 500:
-                                orders[current_order] += qty
-                        except ValueError:
-                            continue
-        return orders, invoice_id
+                # Avsluta tidigare order när ny hittas
+                order_match = re.search(r"Zamówienie\s*/\s*Order:\s*(\d{7})", line)
+                if order_match:
+                    current_order = order_match.group(1)
+                    continue
+
+                # Om ny orderrubrik utan nummer hittas – nollställ
+                elif "Zamówienie / Order" in line:
+                    current_order = None
+                    continue
+
+                qty_match = re.search(r"P\s+(\d+(?:[.,]\d+)?)\s*pcs", line, re.IGNORECASE)
+                if current_order and qty_match:
+                    try:
+                        qty = int(float(qty_match.group(1).replace(",", ".")))
+                        if 0 < qty < 500:
+                            orders[current_order] += qty
+                    except ValueError:
+                        continue
+    return orders, invoice_id
 
     def compare_orders(confirmation, invoice):
         all_orders = set(confirmation.keys()) | set(invoice.keys())
