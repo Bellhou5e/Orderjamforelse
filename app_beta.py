@@ -33,43 +33,40 @@ def kontroll_pressglass():
         lines = text.splitlines()
 
         orders = defaultdict(int)
-        previous_order = None
+        current_order = None
+        found_qty = False
 
         for i, line in enumerate(lines):
             reorder_match = re.search(r"Reorder\s+(\d{7})", line)
             if reorder_match:
-                order_number = reorder_match.group(1)
-                qty_match = re.search(r"(\d{1,3})\s*$", line)
-                if qty_match:
-                    try:
-                        qty = int(qty_match.group(1))
-                        if 0 < qty < 500:
-                            orders[order_number] += qty
-                    except ValueError:
-                        continue
+                current_order = reorder_match.group(1)
+                found_qty = False
                 continue
 
             parts = line.strip().split()
             if len(parts) >= 6:
                 possible_order = parts[3]
-                try:
-                    qty = int(parts[-1])
-                    if re.fullmatch(r"\d{7}", possible_order) and 0 < qty < 500:
-                        orders[possible_order] += qty
-                        previous_order = possible_order
+                if re.fullmatch(r"\d{7}", possible_order):
+                    current_order = possible_order
+                    found_qty = False
+                    try:
+                        qty = int(parts[-1])
+                        if 0 < qty < 500:
+                            orders[current_order] += qty
+                            found_qty = True
+                    except ValueError:
                         continue
-                except ValueError:
                     continue
 
-            # Extra fallback: om föregående rad var ordernummer och denna rad är bara ett tal
-            if previous_order:
+            if current_order and not found_qty:
                 fallback_qty_match = re.fullmatch(r"\s*(\d{1,3})\s*", line)
                 if fallback_qty_match:
                     try:
                         qty = int(fallback_qty_match.group(1))
                         if 0 < qty < 500:
-                            orders[previous_order] += qty
-                            previous_order = None
+                            orders[current_order] += qty
+                            found_qty = True
+                            current_order = None
                     except ValueError:
                         continue
         return orders
@@ -88,6 +85,11 @@ def kontroll_pressglass():
                     order_match = re.search(r"Zamówienie\s*/\s*Order:\s*(\d{7})", line)
                     if order_match:
                         current_order = order_match.group(1)
+                        continue  # Stop processing further on this line
+                    elif re.search(r"Zamówienie\s*/\s*Order", line):
+                        current_order = None
+                        continue
+
                     qty_match = re.search(r"P\s+(\d+(?:[.,]\d+)?)\s*pcs", line, re.IGNORECASE)
                     if current_order and qty_match:
                         try:
