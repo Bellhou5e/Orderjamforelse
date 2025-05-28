@@ -34,21 +34,25 @@ def kontroll_pressglass():
 
         orders = defaultdict(int)
         for line in lines:
-            parts = line.strip().split()
-            order_number = next((p for p in parts if re.fullmatch(r"\d{7}", p)), None)
-            if order_number:
-                try:
-                    qty = next((int(float(p.replace(",", "."))) for p in reversed(parts) if re.match(r"\d+[.,]?\d*", p)), 0)
+            if "Reorder" in line:
+                match = re.search(r"Reorder\s+(\d{7})", line)
+                qty_match = re.search(r"(\d+)$", line)
+                if match and qty_match:
+                    order_number = match.group(1)
+                    qty = int(qty_match.group(1))
                     orders[order_number] += qty
-                except ValueError:
-                    pass
+            else:
+                match = re.search(r"\s(\d{7})\s+(\d+)$", line.strip())
+                if match:
+                    order_number = match.group(1)
+                    qty = int(match.group(2))
+                    orders[order_number] += qty
         return orders
 
     def extract_orders_from_invoice(pdf_file):
         orders = defaultdict(int)
+        current_order = None
         invoice_id = ""
-        quantity_units = ["pcs", "stk", "szt", "st"]
-
         with pdfplumber.open(pdf_file) as pdf:
             for page in pdf.pages:
                 lines = page.extract_text().split("\n")
@@ -56,21 +60,13 @@ def kontroll_pressglass():
                     match = re.search(r"Faktura(?:nr|nummer)[:\s]*([\w\d-]+)", line, re.IGNORECASE)
                     if match:
                         invoice_id = match.group(1)
-
-                current_order = None
-                for line in reversed(lines):
-                    order_match = re.search(r"Order[:\/\-]?\s*(\d{7})", line)
+                    order_match = re.search(r"Zamówienie\s*/\s*Order:\s*(\d{7})", line)
                     if order_match:
                         current_order = order_match.group(1)
-                    elif current_order:
-                        for unit in quantity_units:
-                            qty_matches = re.findall(rf"(\d+[.,]?\d*)\s*{unit}", line, re.IGNORECASE)
-                            for qty_str in qty_matches:
-                                try:
-                                    qty = int(float(qty_str.replace(",", ".")))
-                                    orders[current_order] += qty
-                                except ValueError:
-                                    pass
+                    qty_match = re.search(r"P\s+(\d+(?:[.,]\d+)?)\s*pcs", line, re.IGNORECASE)
+                    if current_order and qty_match:
+                        qty = int(float(qty_match.group(1).replace(",", ".")))
+                        orders[current_order] += qty
         return orders, invoice_id
 
     def compare_orders(confirmation, invoice):
