@@ -75,6 +75,8 @@ def kontroll_pressglass():
         orders = defaultdict(int)
         current_order = None
         invoice_id = ""
+        awaiting_qty = False
+
         with pdfplumber.open(pdf_file) as pdf:
             for page in pdf.pages:
                 lines = page.extract_text().split("\n")
@@ -83,22 +85,33 @@ def kontroll_pressglass():
                     if faktura_id_match:
                         invoice_id = faktura_id_match.group(1)
 
-                    if "Zamówienie / Order" in line:
-                        new_order_match = re.search(r"Zamówienie\s*/\s*Order:\s*(\d{7})", line)
-                        if new_order_match:
-                            current_order = new_order_match.group(1)
-                        else:
-                            current_order = None
+                    order_match = re.search(r"Zamówienie\s*/\s*Order:\s*(\d{7})", line)
+                    if order_match:
+                        current_order = order_match.group(1)
+                        awaiting_qty = True
+                        continue
+
+                    # Om vi når en annan orderrad utan nummer, nollställ för säkerhets skull
+                    if "Zamówienie / Order" in line and not order_match:
+                        current_order = None
+                        awaiting_qty = False
                         continue
 
                     qty_match = re.search(r"P\s+(\d+(?:[.,]\d+)?)\s*pcs", line, re.IGNORECASE)
-                    if current_order and qty_match:
+                    if current_order and qty_match and awaiting_qty:
                         try:
                             qty = int(float(qty_match.group(1).replace(",", ".")))
                             if 0 < qty < 500:
                                 orders[current_order] += qty
                         except ValueError:
                             continue
+                    elif qty_match:
+                        # Om en kvantitet hittas utan en aktiv order – ignorera
+                        continue
+
+                    # Om raden inte har kvantitet, sluta vänta
+                    if not qty_match:
+                        awaiting_qty = False
         return orders, invoice_id
 
     def compare_orders(confirmation, invoice):
